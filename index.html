@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#ff6600" />
+  <link rel="manifest" href="./manifest.json" />
+  
+  <link rel="icon" type="image/png" sizes="192x192" href="./icon.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="./icon.png" />
+
+  <title>Trophy Hunter</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root {
+      --bg-color: #121212;
+      --card-bg: #1e1e1e;
+      --accent: #ff6600;
+      --text: #f5f5f5;
+      --text-muted: #a0a0a0;
+      --border: #333333;
+      --danger: #d9534f;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text);
+      margin: 0;
+      padding: 16px 16px 80px 16px;
+    }
+    h1, h2, h3 { color: var(--accent); text-transform: uppercase; letter-spacing: 1px; margin-top: 0; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; margin-top: 10px; color: var(--text-muted); font-size: 0.9rem; }
+    input, select, button { width: 100%; padding: 12px; margin-top: 5px; border-radius: 6px; border: 1px solid var(--border); background-color: #2a2a2a; color: var(--text); box-sizing: border-box; font-size: 1rem; }
+    input:focus, select:focus { outline: 2px solid var(--accent); }
+    button.btn-primary { background-color: var(--accent); color: #000; font-weight: bold; border: none; margin-top: 15px; cursor: pointer; }
+    button.btn-secondary { background-color: transparent; border: 1px solid var(--accent); color: var(--accent); margin-top: 10px; cursor: pointer; }
+    button.btn-action { background-color: transparent; border: 1px solid var(--border); color: var(--text); font-size: 0.85rem; padding: 6px 12px; margin-top: 10px; margin-right: 5px; cursor: pointer; width: auto; display: inline-block; }
+    button.btn-delete { border-color: var(--danger); color: var(--danger); }
+    
+    .view-section { display: none; }
+    .view-section.active { display: block; }
+
+    .category-card { display: flex; justify-content: space-between; align-items: center; padding: 18px; cursor: pointer; border-left: 4px solid var(--accent); margin-bottom: 12px; }
+    .category-name { font-size: 1.15rem; font-weight: bold; }
+    .category-count { background-color: var(--accent); color: #000; font-weight: bold; border-radius: 12px; padding: 2px 10px; font-size: 0.85rem; }
+
+    .leader-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .leader-row:last-child { border-bottom: none; }
+
+    .btn-back { background-color: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 8px 14px; margin-bottom: 16px; width: auto; display: inline-block; font-size: 0.9rem; font-weight: bold; cursor: pointer; }
+
+    .entry { border-bottom: 1px solid var(--border); padding: 12px 0; }
+    .entry:last-child { border-bottom: none; }
+    .entry img { max-width: 100%; border-radius: 6px; margin-top: 8px; display: block; }
+    .meta { font-size: 0.85rem; color: var(--text-muted); }
+    .hunter-badge { color: var(--accent); font-weight: bold; font-size: 0.85rem; text-transform: uppercase; margin-bottom: 4px; }
+
+    .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; height: 60px; background-color: #1a1a1a; border-top: 1px solid var(--border); display: flex; justify-content: space-around; align-items: center; z-index: 1000; }
+    .nav-btn { background: none; border: none; color: var(--text-muted); font-size: 0.75rem; font-weight: bold; text-transform: uppercase; padding: 0; margin: 0; height: 100%; width: 25%; cursor: pointer; }
+    .nav-btn.active { color: var(--accent); border-top: 3px solid var(--accent); }
+  </style>
+</head>
+<body>
+
+  <div id="authView" class="view-section active">
+    <h1>Trophy Hunter</h1>
+    <div class="card">
+      <h2 id="authTitle">Sign In</h2>
+      <form id="authForm">
+        <label for="authUsername" id="usernameLabel" style="display:none;">Hunter Name / Alias</label>
+        <input type="text" id="authUsername" placeholder="e.g. HunterBob" style="display:none;" />
+
+        <label for="authEmail">Email</label>
+        <input type="email" id="authEmail" placeholder="your@email.com" required />
+
+        <label for="authPassword">Password</label>
+        <input type="password" id="authPassword" placeholder="••••••••" required />
+
+        <button type="submit" id="authSubmitBtn" class="btn-primary">Sign In</button>
+        <button type="button" class="btn-secondary" onclick="toggleAuthMode()">Switch to Sign Up</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="homeView" class="view-section">
+    <h1>Trophy Hunter</h1>
+    <div class="card">
+      <h2 id="formHeader">New Log</h2>
+      <form id="logForm">
+        <input type="hidden" id="editingLogId" value="" />
+        
+        <label for="category">Category</label>
+        <select id="category" required>
+          <option value="" disabled selected>Select Category...</option>
+          <option value="Fox">Fox</option>
+          <option value="Cat">Cat</option>
+          <option value="Dog">Dog</option>
+          <option value="Deer">Deer</option>
+          <option value="Goat">Goat</option>
+          <option value="Pig">Pig</option>
+        </select>
+
+        <label for="animal">Specific Animal / Details</label>
+        <input type="text" id="animal" placeholder="e.g. Red Fox, Fallow Buck" required />
+
+        <label for="weight">Weight (kg / lbs)</label>
+        <input type="number" id="weight" step="0.1" placeholder="e.g. 180" required />
+
+        <label for="calibre">Calibre / Firearm</label>
+        <input type="text" id="calibre" placeholder="e.g. .308 Win, 12 Gauge" required />
+
+        <label for="location">Location (GPS)</label>
+        <input type="text" id="location" placeholder="Coordinates" readonly />
+        <button type="button" class="btn-secondary" onclick="getLocation()">Get Current GPS</button>
+
+        <label for="photo">Trophy Photo</label>
+        <input type="file" id="photo" accept="image/*" />
+
+        <button type="submit" id="saveLogBtn" class="btn-primary">Save Log Entry</button>
+        <button type="button" id="cancelEditBtn" class="btn-secondary" style="display:none;" onclick="resetForm()">Cancel Edit</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="categoriesView" class="view-section">
+    <h1>Logged Animals</h1>
+    <p class="meta" style="margin-bottom: 16px;">Select a category to view trophies:</p>
+    <div id="categoryMenu"></div>
+  </div>
+
+  <div id="singleCategoryView" class="view-section">
+    <button class="btn-back" onclick="showCategoriesMenu()">← Back to Categories</button>
+    <h1 id="selectedCategoryTitle">Category</h1>
+    <div id="categoryLogsList"></div>
+  </div>
+
+  <div id="feedView" class="view-section">
+    <h1>Family Feed</h1>
+    <div id="familyFeedList"></div>
+  </div>
+
+  <div id="leaderboardView" class="view-section">
+    <h1>Leaderboard</h1>
+    <div class="card">
+      <h2>Top Harvests</h2>
+      <div id="leaderboardList"></div>
+    </div>
+  </div>
+
+  <div id="bottomNav" class="bottom-nav" style="display:none;">
+    <button id="navHome" class="nav-btn active" onclick="switchTab('home')">Log</button>
+    <button id="navCategories" class="nav-btn" onclick="switchTab('categories')">Animals</button>
+    <button id="navFeed" class="nav-btn" onclick="switchTab('feed')">Feed</button>
+    <button id="navLeaderboard" class="nav-btn" onclick="switchTab('leaderboard')">Leaderboard</button>
+  </div>
+
+  <script>
+    // --- SUPABASE CREDENTIALS ---
+    const SUPABASE_URL = "https://gtzalsoxoatemjcijrrt.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd0emFsc294b2F0ZW1qY2lqcnJ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1ODczODEsImV4cCI6MjEwNDE2MzM4MX0.NKyfF7sNdjKV9bXGop_xTbVlWAGpCIR5mzecSCNKniY";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let currentUser = null;
+    let isSignUpMode = false;
+    let currentOpenCategory = null;
+    const CATEGORIES = ["Fox", "Cat", "Dog", "Deer", "Goat", "Pig"];
+
+    window.addEventListener('load', async () => {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (session) {
+        currentUser = session.user;
+        showApp();
+      } else {
+        showAuth();
+      }
+
+      supabaseClient.auth.onAuthStateChange((event, session) => {
+        if (session) {
+          currentUser = session.user;
+          showApp();
+        } else {
+          currentUser = null;
+          showAuth();
+        }
+      });
+    });
+
+    function toggleAuthMode() {
+      isSignUpMode = !isSignUpMode;
+      document.getElementById('authTitle').innerText = isSignUpMode ? "Sign Up" : "Sign In";
+      document.getElementById('authSubmitBtn').innerText = isSignUpMode ? "Create Account" : "Sign In";
+      document.getElementById('usernameLabel').style.display = isSignUpMode ? "block" : "none";
+      document.getElementById('authUsername').style.display = isSignUpMode ? "block" : "none";
+    }
+
+    document.getElementById('authForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('authEmail').value;
+      const password = document.getElementById('authPassword').value;
+
+      if (isSignUpMode) {
+        const username = document.getElementById('authUsername').value;
+        const { data, error } = await supabaseClient.auth.signUp({ email, password });
+        if (error) return alert(error.message);
+
+        if (data.user) {
+          await supabaseClient.from('profiles').insert([{ id: data.user.id, username }]);
+          alert("Account created successfully!");
+        }
+      } else {
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) alert(error.message);
+      }
+    });
+
+    function showAuth() {
+      document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+      document.getElementById('authView').classList.add('active');
+      document.getElementById('bottomNav').style.display = "none";
+    }
+
+    function showApp() {
+      document.getElementById('bottomNav').style.display = "flex";
+      switchTab('home');
+    }
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+
+      if (tabName === 'home') {
+        document.getElementById('homeView').classList.add('active');
+        document.getElementById('navHome').classList.add('active');
+      } else if (tabName === 'categories') {
+        document.getElementById('categoriesView').classList.add('active');
+        document.getElementById('navCategories').classList.add('active');
+        renderCategoryMenu();
+      } else if (tabName === 'feed') {
+        document.getElementById('feedView').classList.add('active');
+        document.getElementById('navFeed').classList.add('active');
+        renderFeed();
+      } else if (tabName === 'leaderboard') {
+        document.getElementById('leaderboardView').classList.add('active');
+        document.getElementById('navLeaderboard').classList.add('active');
+        renderLeaderboard();
+      }
+    }
+
+    function showCategoriesMenu() {
+      document.getElementById('categoriesView').classList.add('active');
+      document.getElementById('singleCategoryView').classList.remove('active');
+      renderCategoryMenu();
+    }
+
+    function openCategoryPage(cat) {
+      currentOpenCategory = cat;
+      document.getElementById('categoriesView').classList.remove('active');
+      document.getElementById('singleCategoryView').classList.add('active');
+      document.getElementById('selectedCategoryTitle').innerText = cat;
+      renderCategoryLogs(cat);
+    }
+
+    function getLocation() {
+      const locInput = document.getElementById('location');
+      if (navigator.geolocation) {
+        locInput.placeholder = "Fetching location...";
+        navigator.geolocation.getCurrentPosition(
+          (pos) => { locInput.value = `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`; },
+          () => { locInput.placeholder = "Location access denied"; },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      } else {
+        locInput.placeholder = "GPS not supported";
+      }
+    }
+
+    document.getElementById('logForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const editId = document.getElementById('editingLogId').value;
+      const file = document.getElementById('photo').files[0];
+      let photoUrl = null;
+
+      if (file) {
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${currentUser.id}/${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabaseClient.storage.from('trophy-photos').upload(filePath, file);
+        if (uploadError) return alert("Photo upload failed: " + uploadError.message);
+
+        const { data: urlData } = supabaseClient.storage.from('trophy-photos').getPublicUrl(filePath);
+        photoUrl = urlData.publicUrl;
+      }
+
+      const logData = {
+        user_id: currentUser.id,
+        category: document.getElementById('category').value,
+        animal: document.getElementById('animal').value,
+        weight: parseFloat(document.getElementById('weight').value),
+        calibre: document.getElementById('calibre').value,
+        location: document.getElementById('location').value || 'Not recorded'
+      };
+
+      if (photoUrl) logData.photo_url = photoUrl;
+
+      if (editId) {
+        const { error } = await supabaseClient.from('trophies').update(logData).eq('id', editId);
+        if (error) alert(error.message);
+        else alert("Log updated successfully!");
+      } else {
+        const { error } = await supabaseClient.from('trophies').insert([logData]);
+        if (error) alert(error.message);
+      }
+
+      resetForm();
+      switchTab('feed');
+    });
+
+    function startEditLog(log) {
+      document.getElementById('editingLogId').value = log.id;
+      document.getElementById('category').value = log.category;
+      document.getElementById('animal').value = log.animal;
+      document.getElementById('weight').value = log.weight;
+      document.getElementById('calibre').value = log.calibre;
+      document.getElementById('location').value = log.location;
+      
+      document.getElementById('formHeader').innerText = "Edit Log";
+      document.getElementById('saveLogBtn').innerText = "Update Log Entry";
+      document.getElementById('cancelEditBtn').style.display = "block";
+      switchTab('home');
+    }
+
+    function resetForm() {
+      document.getElementById('logForm').reset();
+      document.getElementById('editingLogId').value = "";
+      document.getElementById('formHeader').innerText = "New Log";
+      document.getElementById('saveLogBtn').innerText = "Save Log Entry";
+      document.getElementById('cancelEditBtn').style.display = "none";
+    }
+
+    async function deleteLog(id) {
+      if (confirm("Are you sure you want to delete this log entry?")) {
+        const { error } = await supabaseClient.from('trophies').delete().eq('id', id);
+        if (error) alert(error.message);
+        else {
+          if (currentOpenCategory) renderCategoryLogs(currentOpenCategory);
+          renderFeed();
+        }
+      }
+    }
+
+    async function renderCategoryMenu() {
+      const { data: trophies } = await supabaseClient.from('trophies').select('category');
+      const container = document.getElementById('categoryMenu');
+      let html = '';
+
+      CATEGORIES.forEach(cat => {
+        const count = trophies ? trophies.filter(t => t.category === cat).length : 0;
+        html += `
+          <div class="card category-card" onclick="openCategoryPage('${cat}')">
+            <span class="category-name">${cat}</span>
+            <span class="category-count">${count}</span>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    }
+
+    async function renderCategoryLogs(categoryName) {
+      const { data: logs } = await supabaseClient.from('trophies').select('*, profiles(username)').eq('category', categoryName).order('created_at', { ascending: false });
+      const container = document.getElementById('categoryLogsList');
+
+      if (!logs || logs.length === 0) {
+        container.innerHTML = '<div class="card"><p class="meta">No logs in this category yet.</p></div>';
+        return;
+      }
+
+      container.innerHTML = '<div class="card">' + logs.map(log => renderLogHTML(log)).join('') + '</div>';
+    }
+
+    async function renderFeed() {
+      const { data: logs } = await supabaseClient.from('trophies').select('*, profiles(username)').order('created_at', { ascending: false });
+      const container = document.getElementById('familyFeedList');
+
+      if (!logs || logs.length === 0) {
+        container.innerHTML = '<div class="card"><p class="meta">No activity yet. Be the first to log a trophy!</p></div>';
+        return;
+      }
+
+      container.innerHTML = '<div class="card">' + logs.map(log => renderLogHTML(log)).join('') + '</div>';
+    }
+
+    async function renderLeaderboard() {
+      const { data: profiles } = await supabaseClient.from('profiles').select('id, username');
+      const { data: trophies } = await supabaseClient.from('trophies').select('user_id');
+
+      if (!profiles || !trophies) return;
+
+      const counts = {};
+      trophies.forEach(t => { counts[t.user_id] = (counts[t.user_id] || 0) + 1; });
+
+      const leaderboard = profiles.map(p => ({ username: p.username, count: counts[p.id] || 0 }))
+                                   .sort((a, b) => b.count - a.count);
+
+      const container = document.getElementById('leaderboardList');
+      container.innerHTML = leaderboard.map((item, idx) => `
+        <div class="leader-row">
+          <span><strong>#${idx + 1}</strong> ${item.username}</span>
+          <span style="color: var(--accent); font-weight: bold;">${item.count} Trophies</span>
+        </div>
+      `).join('');
+    }
+
+    function renderLogHTML(log) {
+      const isOwner = currentUser && currentUser.id === log.user_id;
+      const hunterName = log.profiles ? log.profiles.username : "Unknown Hunter";
+      const dateStr = new Date(log.created_at).toLocaleDateString();
+
+      return `
+        <div class="entry">
+          <div class="hunter-badge">Logged by ${hunterName}</div>
+          <strong style="font-size: 1.1rem;">${log.animal} (${log.category})</strong>
+          <div class="meta">${dateStr} • GPS: ${log.location}</div>
+          <p style="margin: 6px 0;"><strong>Weight:</strong> ${log.weight} | <strong>Calibre:</strong> ${log.calibre}</p>
+          ${log.photo_url ? `<img src="${log.photo_url}" alt="${log.animal}" />` : ''}
+          ${isOwner ? `
+            <div style="margin-top: 8px;">
+              <button class="btn-action" onclick='startEditLog(${JSON.stringify(log)})'>Edit Entry</button>
+              <button class="btn-action btn-delete" onclick="deleteLog(${log.id})">Delete Entry</button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('SW Registered'))
+          .catch(err => console.error('SW Failed', err));
+      });
+    }
+  </script>
+</body>
+</html>

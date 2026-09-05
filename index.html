@@ -49,6 +49,7 @@
 
     .leader-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
     .leader-row:last-child { border-bottom: none; }
+    .leader-details { font-size: 0.85rem; color: var(--text-muted); }
 
     .btn-back { background-color: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 8px 14px; margin-bottom: 16px; width: auto; display: inline-block; font-size: 0.9rem; font-weight: bold; cursor: pointer; }
 
@@ -65,6 +66,7 @@
 </head>
 <body>
 
+  <!-- VIEW 0: LOGIN / SIGNUP -->
   <div id="authView" class="view-section active">
     <h1>Trophy Hunter</h1>
     <div class="card">
@@ -85,6 +87,7 @@
     </div>
   </div>
 
+  <!-- VIEW 1: HOME SCREEN (LOG FORM) -->
   <div id="homeView" class="view-section">
     <h1>Trophy Hunter</h1>
     <div class="card">
@@ -125,31 +128,33 @@
     </div>
   </div>
 
+  <!-- VIEW 2: CATEGORIES -->
   <div id="categoriesView" class="view-section">
     <h1>Logged Animals</h1>
     <p class="meta" style="margin-bottom: 16px;">Select a category to view trophies:</p>
     <div id="categoryMenu"></div>
   </div>
 
+  <!-- VIEW 3: CATEGORY DETAIL -->
   <div id="singleCategoryView" class="view-section">
     <button class="btn-back" onclick="showCategoriesMenu()">← Back to Categories</button>
     <h1 id="selectedCategoryTitle">Category</h1>
     <div id="categoryLogsList"></div>
   </div>
 
+  <!-- VIEW 4: FAMILY FEED -->
   <div id="feedView" class="view-section">
     <h1>Family Feed</h1>
     <div id="familyFeedList"></div>
   </div>
 
+  <!-- VIEW 5: LEADERBOARD -->
   <div id="leaderboardView" class="view-section">
     <h1>Leaderboard</h1>
-    <div class="card">
-      <h2>Top Harvests</h2>
-      <div id="leaderboardList"></div>
-    </div>
+    <div id="leaderboardContainer"></div>
   </div>
 
+  <!-- BOTTOM NAVIGATION BAR -->
   <div id="bottomNav" class="bottom-nav" style="display:none;">
     <button id="navHome" class="nav-btn active" onclick="switchTab('home')">Log</button>
     <button id="navCategories" class="nav-btn" onclick="switchTab('categories')">Animals</button>
@@ -167,6 +172,7 @@
     let isSignUpMode = false;
     let currentOpenCategory = null;
     const CATEGORIES = ["Fox", "Cat", "Dog", "Deer", "Goat", "Pig"];
+    const WEIGHT_CATEGORIES = ["Pig", "Deer", "Fox", "Goat", "Cat"];
 
     window.addEventListener('load', async () => {
       const { data: { session } } = await supabaseClient.auth.getSession();
@@ -392,24 +398,50 @@
     }
 
     async function renderLeaderboard() {
-      const { data: profiles } = await supabaseClient.from('profiles').select('id, username');
-      const { data: trophies } = await supabaseClient.from('trophies').select('user_id');
+      const { data: logs } = await supabaseClient.from('trophies').select('*, profiles(username)').order('weight', { ascending: false });
+      const container = document.getElementById('leaderboardContainer');
 
-      if (!profiles || !trophies) return;
+      if (!logs || logs.length === 0) {
+        container.innerHTML = '<div class="card"><p class="meta">No recorded harvests yet to rank.</p></div>';
+        return;
+      }
 
-      const counts = {};
-      trophies.forEach(t => { counts[t.user_id] = (counts[t.user_id] || 0) + 1; });
+      let html = '';
 
-      const leaderboard = profiles.map(p => ({ username: p.username, count: counts[p.id] || 0 }))
-                                   .sort((a, b) => b.count - a.count);
+      WEIGHT_CATEGORIES.forEach(cat => {
+        const categoryLogs = logs.filter(l => l.category === cat);
+        
+        // Filter: Keep max 2 heaviest entries per hunter
+        const hunterCounts = {};
+        const filteredLogs = categoryLogs.filter(log => {
+          const hunterId = log.user_id;
+          hunterCounts[hunterId] = (hunterCounts[hunterId] || 0) + 1;
+          return hunterCounts[hunterId] <= 2;
+        });
 
-      const container = document.getElementById('leaderboardList');
-      container.innerHTML = leaderboard.map((item, idx) => `
-        <div class="leader-row">
-          <span><strong>#${idx + 1}</strong> ${item.username}</span>
-          <span style="color: var(--accent); font-weight: bold;">${item.count} Trophies</span>
-        </div>
-      `).join('');
+        html += `<div class="card">`;
+        html += `<h2>Heaviest ${cat}</h2>`;
+
+        if (filteredLogs.length === 0) {
+          html += `<p class="meta">No ${cat} logs recorded yet.</p>`;
+        } else {
+          filteredLogs.forEach((log, idx) => {
+            const hunterName = log.profiles ? log.profiles.username : "Unknown Hunter";
+            html += `
+              <div class="leader-row">
+                <div>
+                  <strong>#${idx + 1} ${hunterName}</strong>
+                  <div class="leader-details">${log.animal}</div>
+                </div>
+                <span style="color: var(--accent); font-weight: bold; font-size: 1.1rem;">${log.weight}</span>
+              </div>
+            `;
+          });
+        }
+        html += `</div>`;
+      });
+
+      container.innerHTML = html;
     }
 
     function renderLogHTML(log) {

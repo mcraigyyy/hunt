@@ -1,4 +1,4 @@
-const CACHE_NAME = 'trophy-hunter-v5';
+const CACHE_NAME = 'trophy-hunter-v6';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
